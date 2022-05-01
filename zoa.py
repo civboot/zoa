@@ -304,61 +304,63 @@ class TG(Enum): # Token Group
 class ParseError(RuntimeError):
   def __init__(self, line, msg): return super().__init__(f'line {line}: {msg}')
 
-# @dataclass
-# class Parser:
-#   env: TyEnv = TyEnv.__init__
-#   mod: str = None
-#   buf: bytearray = lambda: bytearray()
-#   i: int = 0
-#   line: int = 1
-# 
-#   def token(self) -> str:
-#     group, starti = None, i
-#     while i < len(buf):
-#       c = buf[i]; i += 1
-#       if c == '\n': line += 1
-#       cgroup = TG.fromChr(c)
-#       if cgroup == TG.T_WHITE:
-#         if group is None: continue
-#         else: return buf[i-1:i]
-#       if cgroup == TG.T_SINGLE:
-#         return buf[i-1:i]
-#       if group is None:     group = cgroup
-#       elif group == cgroup: pass
-#       elif (group <= T_ALPHA) and (cgroup <= T_ALPHA): pass
-#       else: return buf[i-1:i]
-# 
-#   def peek(self) -> str:
-#     starti = i
-#     out = self.token()
-#     i = starti
-#     return out
-# 
-#   def parseError(self, msg): raise ParseError(self.line, msg)
-#   def sugar(self, s):
-#     if self.token() != s.encode('utf-8'): self.parseError(f"Expected |{s}|")
-# 
-#   def parseTy(self) -> Ty:
-#     name = self.token()
-#     # TODO: handle [ ... ] cases
-#     return self.env.tys[name]
-# 
-#   def parseField(self) -> StructField:
-#     name = self.token(); self.sugar(':')
-#     # TODO: handle zid case
-#     ty = self.parseTy()
-#     return (name, StructField(ty=ty))
-# 
-#   def parseStruct(self) -> StructBase:
-#     name = self.token();
-#     fields = []
-#     self.sugar('[')
-#     while self.peek() != ']':
-#       fields.append(self.parseField())
-#       self.sugar(';')
-#     self.sugar(']')
-#     return self.env.struct(self.mod, name, fields)
-# 
-#   def parseFile(self):
-#     while i < len(buf):
-# 
+@dataclass
+class Parser:
+  env: TyEnv = TyEnv.__init__
+  mod: str = None
+  buf: bytearray = lambda: bytearray()
+  i: int = 0
+  line: int = 1
+
+  def error(self, msg): raise ParseError(self.line, msg)
+
+  def token(self) -> str:
+    group, starti = None, i
+    while i < len(buf):
+      c = buf[i]; i += 1
+      if c == '\n': line += 1
+      cgroup = TG.fromChr(c)
+      if cgroup == TG.T_WHITE:
+        if group is None: continue
+        else: return buf[i-1:i]
+      if cgroup == TG.T_SINGLE:
+        return buf[i-1:i]
+      if group is None:     group = cgroup
+      elif group == cgroup: pass
+      elif (group <= T_ALPHA) and (cgroup <= T_ALPHA): pass
+      else: return buf[i-1:i]
+
+  def peek(self) -> str:
+    starti = i
+    out = self.token()
+    i = starti
+    return out
+
+  def sugar(self, s):
+    if self.token() != s.encode('utf-8'): self.error(f"Expected |{s}|")
+
+  def parseTy(self) -> Any:
+    name = self.token()
+    # TODO: handle [ ... ] cases
+    return self.env.tys[name]
+
+  def parseField(self) -> StructField:
+    name = self.token(); self.sugar(':')
+    # TODO: handle zid case
+    ty = self.parseTy()
+    return (name, StructField(ty=ty))
+
+  def parseStruct(self) -> StructBase:
+    name = self.token();
+    fields = []
+    self.sugar('[')
+    while self.peek() != ']':
+      fields.append(self.parseField())
+      self.sugar(';')
+    self.sugar(']')
+    return self.env.struct(self.mod, name, fields)
+
+  def parseFile(self):
+    while i < len(buf):
+      token = self.token()
+      if token == 'struct': self.parseStruct()
