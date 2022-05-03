@@ -299,41 +299,41 @@ class TG(Enum): # Token Group
     if(ord('A') <= c and c <= ord('F')): return cls.T_HEX;
     if(ord('g') <= c and c <= ord('z')): return cls.T_ALPHA;
     if(ord('G') <= c and c <= ord('Z')): return cls.T_ALPHA;
-    raise ValueError(c)
+    return cls.T_SYMBOL
 
 class ParseError(RuntimeError):
   def __init__(self, line, msg): return super().__init__(f'line {line}: {msg}')
 
 @dataclass
 class Parser:
+  buf: bytearray
   env: TyEnv = TyEnv.__init__
   mod: str = None
-  buf: bytearray = lambda: bytearray()
   i: int = 0
   line: int = 1
 
   def error(self, msg): raise ParseError(self.line, msg)
 
   def token(self) -> str:
-    group, starti = None, i
-    while i < len(buf):
-      c = buf[i]; i += 1
+    group, starti = None, self.i
+    while self.i < len(self.buf):
+      c = self.buf[self.i]; self.i += 1
       if c == '\n': line += 1
       cgroup = TG.fromChr(c)
       if cgroup == TG.T_WHITE:
         if group is None: continue
-        else: return buf[i-1:i]
+        else: return self.buf[self.i-1:self.i]
       if cgroup == TG.T_SINGLE:
-        return buf[i-1:i]
+        return self.buf[self.i-1:i]
       if group is None:     group = cgroup
       elif group == cgroup: pass
-      elif (group <= T_ALPHA) and (cgroup <= T_ALPHA): pass
-      else: return buf[i-1:i]
+      elif (group.value <= TG.T_ALPHA.value) and (cgroup.value <= TG.T_ALPHA.value): pass
+      else: return self.buf[self.i-1:self.i]
 
   def peek(self) -> str:
-    starti = i
+    starti = self.i
     out = self.token()
-    i = starti
+    self.i = starti
     return out
 
   def sugar(self, s):
@@ -360,7 +360,7 @@ class Parser:
     self.sugar(']')
     return self.env.struct(self.mod, name, fields)
 
-  def parseFile(self):
-    while i < len(buf):
+  def parse(self):
+    while self.i < len(self.buf):
       token = self.token()
       if token == 'struct': self.parseStruct()

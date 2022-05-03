@@ -119,5 +119,10 @@ class TestZoaTy(unittest.TestCase):
     assert False == bm.isB()
     assert True == bm.isTop()
 
+class TestParse(unittest.TestCase):
+  def test_struct(self):
+    p = Parser(b'struct [a: Int]')
+    p.parse()
+
 if __name__ == '__main__':
   unittest.main()
