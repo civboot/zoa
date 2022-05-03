@@ -63,10 +63,10 @@ class TestZoaRaw(unittest.TestCase):
     assert_roundtrip(a)
 
 
-class TestZoaTy(unittest.TestCase):
-  def setUp(self):
-    self.env = TyEnv()
+class TestBase(unittest.TestCase):
+  def setUp(self): self.env = TyEnv()
 
+class TestZoaTy(TestBase):
   def test_int(self):
     assert b'\x42' == Int(0x42).toZ().data
     assert 0x42 == Int.frZ(ZoaRaw.new_data(b'\x42'))
@@ -119,10 +119,30 @@ class TestZoaTy(unittest.TestCase):
     assert False == bm.isB()
     assert True == bm.isTop()
 
-class TestParse(unittest.TestCase):
-  def test_struct(self):
-    p = Parser(b'struct [a: Int]')
-    p.parse()
+def tokens(buf):
+  out, p = [], Parser(buf)
+  while p.i < len(buf): out.append(p.token().decode('utf-8'))
+  return out
+
+class TestParse(TestBase):
+  def test_TG(self):
+    assert TG.fromChr(ord(' ')) is TG.T_WHITE
+    assert TG.fromChr(ord('\n')) is TG.T_WHITE
+    assert TG.fromChr(ord('f')) is TG.T_HEX
+    assert TG.fromChr(ord('g')) is TG.T_ALPHA
+    assert TG.fromChr(ord('_')) is TG.T_ALPHA
+    assert TG.fromChr(ord('.')) is TG.T_SINGLE
+
+  def test_tokens(self):
+    assert tokens(b'a_b[foo.bar baz]') == [
+      'a_b', '[', 'foo', '.', 'bar', 'baz', ']']
+
+
+  # def test_struct(self):
+  #   p = Parser(b'struct foo [a: Int]')
+  #   p.parse()
+  #   foo = self.env.tys['foo']
+  #   assert foo._fields == [('a', Int)]
 
 if __name__ == '__main__':
   unittest.main()

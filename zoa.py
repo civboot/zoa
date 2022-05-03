@@ -283,6 +283,8 @@ class TyEnv:
     self.tys[mn] = ty
     return ty
 
+SINGLES = {ord(c) for c in ['%', '\\', '$', '|', '.', '(', ')']}
+
 class TG(Enum): # Token Group
   T_NUM = 0
   T_HEX = 1
@@ -290,6 +292,7 @@ class TG(Enum): # Token Group
   T_SINGLE = 3
   T_SYMBOL = 4
   T_WHITE = 5
+
 
   @classmethod
   def fromChr(cls, c: int):
@@ -299,6 +302,8 @@ class TG(Enum): # Token Group
     if(ord('A') <= c and c <= ord('F')): return cls.T_HEX;
     if(ord('g') <= c and c <= ord('z')): return cls.T_ALPHA;
     if(ord('G') <= c and c <= ord('Z')): return cls.T_ALPHA;
+    if(ord('_') == c)                  : return cls.T_ALPHA;
+    if(c in SINGLES)                   : return cls.T_SINGLE;
     return cls.T_SYMBOL
 
 class ParseError(RuntimeError):
@@ -317,18 +322,25 @@ class Parser:
   def token(self) -> str:
     group, starti = None, self.i
     while self.i < len(self.buf):
-      c = self.buf[self.i]; self.i += 1
+      c = self.buf[self.i]
       if c == '\n': line += 1
       cgroup = TG.fromChr(c)
-      if cgroup == TG.T_WHITE:
-        if group is None: continue
-        else: return self.buf[self.i-1:self.i]
-      if cgroup == TG.T_SINGLE:
-        return self.buf[self.i-1:i]
-      if group is None:     group = cgroup
-      elif group == cgroup: pass
+      print(f'??? i={self.i} c={chr(c)} cgroup={cgroup} group={group}')
+      if group is None:
+        if cgroup is TG.T_WHITE:
+          self.i += 1
+          starti = self.i;
+          continue # skip whitespace
+        group = cgroup
+
+      if cgroup is TG.T_WHITE: break
+      if cgroup is TG.T_SINGLE: break
+      elif group is cgroup: pass
       elif (group.value <= TG.T_ALPHA.value) and (cgroup.value <= TG.T_ALPHA.value): pass
-      else: return self.buf[self.i-1:self.i]
+      else: break
+      self.i += 1
+    print(f"??? Return token: {self.buf[starti:self.i]}")
+    return self.buf[starti:self.i]
 
   def peek(self) -> str:
     starti = self.i
@@ -358,9 +370,11 @@ class Parser:
       fields.append(self.parseField())
       self.sugar(';')
     self.sugar(']')
+    print('??? parse Struct done:', self.mod, name, fields)
     return self.env.struct(self.mod, name, fields)
 
   def parse(self):
     while self.i < len(self.buf):
       token = self.token()
-      if token == 'struct': self.parseStruct()
+      print('??? Got token:', token)
+      if token == b'struct': self.parseStruct()
