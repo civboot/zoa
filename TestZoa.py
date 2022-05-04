@@ -158,5 +158,24 @@ class TestParse(TestBase):
     foo = p.env.tys[b'foo']
     assert foo._fields == [(b'a', StructField(Int))]
 
+    p = Parser(b'struct ab [a: Int; b: Bytes]')
+    p.parse()
+    ab = p.env.tys[b'ab']
+    assert ab._fields == [
+      (b'a', StructField(Int)),
+      (b'b', StructField(Bytes)),
+    ]
+
+  def test_struct_inner(self):
+    p = Parser(b'struct Foo [a: Int]\nstruct Bar[a: Int; f: Foo]')
+    p.parse()
+    Foo = p.env.tys[b'Foo']
+    Bar = p.env.tys[b'Bar']
+    assert Bar._fields == [
+      (b'a', StructField(Int)),
+      (b'f', StructField(Foo)),
+    ]
+
+
 if __name__ == '__main__':
   unittest.main()
