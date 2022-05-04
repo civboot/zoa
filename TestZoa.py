@@ -176,6 +176,5 @@ class TestParse(TestBase):
       (b'f', StructField(Foo)),
     ]
 
-
 if __name__ == '__main__':
   unittest.main()

@@ -221,6 +221,25 @@ class StructBase:
       else: out.append(ZoaRaw.new_arr([f.zid, self.get(name).toZ()]))
     return ZoaRaw.new_arr(out)
 
+@dataclass(init=False)
+class EnumBase:
+  @classmethod
+  def frZ(cls, z: ZoaRaw) -> EnumBase:
+    variant = Int.frZ(z.arr[0])
+    name, ty = self._variants[variant]
+    return cls(**{name.decode('utf-8'): ty})
+
+  def toZ(self) -> ZoaRaw:
+    variant, value = None, None
+    for i, (n, ty) in enumerate(self._variants):
+      v = getattr(self, n.decode('utf-8'))
+      if v:
+        if variant is not None: raise ValueError(
+          f"Multiple variants set: {self._variants[variant]} and {(n, ty)}")
+        variant, value = i, v
+    if variant is None: raise ValueError("No variant set")
+    return ZoaRaw.new_arr([Int(variant).toZ(), value.toZ()])
+
 @dataclass
 class BmVar: # Bitmap Variant
   var: int  # the value for this variant, i.e. 0b10
@@ -269,8 +288,22 @@ class TyEnv:
     ty.name = mn
     ty._fields = fields
     self.tys[mn] = ty
-    print("??? struct:", ty)
-    print("??? tys:", self.tys)
+    return ty
+
+  def enum(self, mod: bytes, name: bytes, variants: List[Tuple[int, Any]]):
+    mn = modname(mod, name)
+    if mn in self.tys: raise KeyError(f"Modname {mn} already exists")
+    ty = dataclasses.make_dataclass(
+      name.decode('utf-8'),
+      [
+        (n.decode('utf-8'), ty, dataclasses.field(default=None))
+        for (n, ty) in variants
+      ],
+      bases=(EnumBase,),
+    )
+    ty.name = mn
+    ty._variants = variants
+    self.tys[mn] = ty
     return ty
 
   def bitmap(self, mod: bytes, name: bytes, variants: List[Tuple[bytes, BmVar]]):
@@ -363,7 +396,6 @@ class Parser:
     name = self.token(); self.need(':')
     # TODO: handle zid case
     ty = self.parseTy()
-    print("??? parsed field:", name)
     return (name, StructField(ty=ty))
 
   def parseStruct(self) -> StructBase:
@@ -372,18 +404,15 @@ class Parser:
     self.need('[')
     while True:
       p = self.peek()
-      print("??? peek:", p)
       if p == b']':
         self.need(']')
         break
       fields.append(self.parseField())
       self.sugar(';')
-    print('??? parse Struct done:', self.mod, name, fields)
     return self.env.struct(self.mod, name, fields)
 
   def parse(self):
     while self.i < len(self.buf):
       token = self.token()
-      print('??? Got token:', token)
       if not token: break
       if token == b'struct': self.parseStruct()
