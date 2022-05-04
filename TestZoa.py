@@ -102,8 +102,18 @@ class TestZoaTy(TestBase):
     assert s.a == 0x77
     assert z == s.toZ()
 
-  # def test_enum(self):
-  #   assert False
+  def test_enum(self):
+    ty = self.env.enum(None, b'en', [
+        (b'a',     Int),
+        (b'b',     Bytes),
+    ])
+    en = ty(a=Int(3))
+    assert en.b is None;    assert 3 == en.a
+    assert en.toZ() == ZoaRaw.new_arr([Int(0).toZ(), Int(3).toZ()])
+    en = ty(b=Bytes(b'hi there enum'))
+    assert en.a is None;     assert en.b == b'hi there enum'
+    assert en.toZ() == ZoaRaw.new_arr([
+      Int(1).toZ(), Bytes(b'hi there enum').toZ()])
 
   def test_bitmap(self):
     ty = self.env.bitmap(None, b'bm', [

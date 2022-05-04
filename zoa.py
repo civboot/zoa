@@ -299,7 +299,7 @@ class TyEnv:
     self.tys[mn] = ty
     return ty
 
-  def enum(self, mod: bytes, name: bytes, variants: List[Tuple[int, Any]]):
+  def enum(self, mod: bytes, name: bytes, variants: List[Tuple[bytes, Any]]):
     mn = modname(mod, name)
     if mn in self.tys: raise KeyError(f"Modname {mn} already exists")
     ty = dataclasses.make_dataclass(
