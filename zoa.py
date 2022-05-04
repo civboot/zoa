@@ -318,7 +318,7 @@ class TyEnv:
   def bitmap(self, mod: bytes, name: bytes, variants: List[Tuple[bytes, BmVar]]):
     mn = modname(mod, name)
     if mn in self.tys: raise KeyError(f"Modname {mn} already exists")
-    methods = {'name': mn}
+    methods = {'name': mn, '_variants': variants}
     for n, var in variants:
       n = n.decode('utf-8')
       methods['get_' + n] = var._getVariantClosure()
@@ -374,7 +374,7 @@ class Parser:
     while TG.fromChr(self.buf[self.i]) is TG.T_WHITE:
       self.i += 1
 
-  def token(self) -> bytes:
+  def _token(self) -> bytes:
     self.skipWhitespace()
     starti = self.i
     group = coaleseTG(TG.fromChr(self.buf[self.i]))
@@ -386,6 +386,31 @@ class Parser:
         return self.buf[starti:self.i]
       self.i += 1
     return self.buf[starti: self.i]
+
+  def _blockComment(self):
+    while self.i < len(self.buf):
+      if self.buf[self.i:self.i+1] == b'\\(':
+        self.i += 2
+        self._blockComment()
+      if self.buf[self.i] == ord(')'):
+        return
+      self.i += 1
+
+  def parseComment(self):
+    if self.buf[self.i] == ord('('): # block comment
+      self.i += 1
+      self._blockComment()
+    elif self.buf[self.i] == ord(' '): # comment till EOL
+      while self.i < len(self.buf) and self.buf[self.i] != ord('\n'):
+        self.i += 1
+    else: # ignore token
+      self._token()
+
+  def token(self):
+    while self.i < len(self.buf):
+      t = self._token()
+      if t == b'\\': self.parseComment()
+      else: return t
 
   def peek(self) -> bytes:
     starti = self.i
@@ -430,8 +455,8 @@ class Parser:
 
   def parseInt(self) -> int:
     t = self.token()
-    if t.startswith('0b'): return int(t[2:], 2)
-    if t.startswith('0x'): return int(t[2:], 16)
+    if t.startswith(b'0b'): return int(t[2:], 2)
+    if t.startswith(b'0x'): return int(t[2:], 16)
     return int(t, 10)
 
   def parseStruct(self) -> StructBase:
@@ -457,36 +482,17 @@ class Parser:
       i = self.i
       # If next token is int, it is the msk
       try: msk = self.parseInt()
-      except ValueError:
+      except ValueError: # else, make it like a peek
         self.i = i
         msk = var
+      self.sugar(';')
       variants.append((vname, BmVar(var, msk)))
-    return self.env.bitmap(name, variants)
-
-  def _blockComment(self):
-    while self.i < len(self.buf):
-      if self.buf[self.i:self.i+1] == b'\\(':
-        self.i += 2
-        self._blockComment()
-      if self.buf[self.i] == ord(')'):
-        return
-      self.i += 1
-
-  def parseComment(self):
-    if self.buf[self.i] == ord('('): # block comment
-      self.i += 1
-      self._blockComment()
-    elif self.buf[self.i] == ord(' '): # comment till EOL
-      while self.i < len(self.buf) and self.buf[self.i] != ord('\n'):
-        self.i += 1
-    else: # ignore token
-      self.token()
+    return self.env.bitmap(self.mod, name, variants)
 
   def parse(self):
     while self.i < len(self.buf):
       token = self.token()
       if not token: break
-      if token == b'\\': self.parseComment()
       if token == b'struct': self.parseStruct()
       if token == b'enum': self.parseEnum()
-      if token == b'bitmap': self.parseBitMap()
+      if token == b'bitmap': self.parseBitmap()
