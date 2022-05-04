@@ -327,7 +327,7 @@ class TyEnv:
     self.tys[mn] = ty
     return ty
 
-SINGLES = {ord(c) for c in ['%', '\\', '$', '|', '.', '(', ')']}
+SINGLES = {ord(c) for c in ['%', '\\', '$', '|', '(', ')']}
 
 class TG(Enum): # Token Group
   T_NUM = 0
@@ -341,11 +341,12 @@ class TG(Enum): # Token Group
   def fromChr(cls, c: int):
     if(c <= ord(' ')):                  return cls.T_WHITE;
     if(ord('0') <= c and c <= ord('9')): return cls.T_NUM;
+    if(ord('_') == c)                  : return cls.T_NUM;
     if(ord('a') <= c and c <= ord('f')): return cls.T_HEX;
     if(ord('A') <= c and c <= ord('F')): return cls.T_HEX;
     if(ord('g') <= c and c <= ord('z')): return cls.T_ALPHA;
     if(ord('G') <= c and c <= ord('Z')): return cls.T_ALPHA;
-    if(ord('_') == c)                  : return cls.T_ALPHA;
+    if(ord('.') == c)                  : return cls.T_ALPHA;
     if(c in SINGLES)                   : return cls.T_SINGLE;
     return cls.T_SYMBOL
 
@@ -397,9 +398,14 @@ class Parser:
   def sugar(self, s):
     if self.peek() == s.encode('utf-8'): self.token() # consume token
 
+  def parseArr(self) -> ArrBase:
+    self.need('['); ty = self.parseTy(); self.need(']')
+    return self.env.arr(ty)
+
   def parseTy(self) -> Any:
     name = self.token()
-    # TODO: handle [ ... ] cases
+    if name == 'Arr':
+      return self.parseArr()
     return self.env.tys[name]
 
   def parseField(self) -> StructField:
@@ -408,7 +414,7 @@ class Parser:
     ty = self.parseTy()
     return (name, StructField(ty=ty))
 
-  def parseStruct(self) -> StructBase:
+  def _parseStruct(self) -> (str, List[StructField]):
     name = self.token();
     fields = []
     self.need('[')
@@ -419,10 +425,24 @@ class Parser:
         break
       fields.append(self.parseField())
       self.sugar(';')
+    return name, fields
+
+  def parseStruct(self) -> StructBase:
+    name, fields = self._parseStruct()
     return self.env.struct(self.mod, name, fields)
+
+  def parseEnum(self) -> EnumBase:
+    name, fields = self._parseStruct()
+    # TODO: handle zid
+    return self.env.enum(self.mod, name, [(n, f.ty) for (n, f) in fields])
+
+  def parseBitmap(self) -> BitmapBase:
+    raise 'foo'
 
   def parse(self):
     while self.i < len(self.buf):
       token = self.token()
       if not token: break
       if token == b'struct': self.parseStruct()
+      if token == b'enum': self.parseEnum()
+      if token == b'bitmap': self.parseBitMap()

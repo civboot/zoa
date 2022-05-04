@@ -62,7 +62,6 @@ class TestZoaRaw(unittest.TestCase):
     a = [ b'one', b'two', b'three', b'four', b'five' ] * 30 # 150
     assert_roundtrip(a)
 
-
 class TestBase(unittest.TestCase):
   def setUp(self):
     self.env = TyEnv()
@@ -148,10 +147,10 @@ class TestParse(TestBase):
   def test_TG(self):
     assert TG.fromChr(ord(' ')) is TG.T_WHITE
     assert TG.fromChr(ord('\n')) is TG.T_WHITE
+    assert TG.fromChr(ord('_')) is TG.T_NUM
     assert TG.fromChr(ord('f')) is TG.T_HEX
     assert TG.fromChr(ord('g')) is TG.T_ALPHA
-    assert TG.fromChr(ord('_')) is TG.T_ALPHA
-    assert TG.fromChr(ord('.')) is TG.T_SINGLE
+    assert TG.fromChr(ord('.')) is TG.T_ALPHA
 
   def test_skipWhitespace(self):
     p = Parser(b'   \nfoo')
@@ -166,7 +165,7 @@ class TestParse(TestBase):
 
   def test_tokens(self):
     assert tokens(b'a_b[foo.bar baz]') == [
-      'a_b', '[', 'foo', '.', 'bar', 'baz', ']']
+      'a_b', '[', 'foo.bar', 'baz', ']']
 
   def test_struct(self):
     p = Parser(b'struct foo [a: Int]')
@@ -190,6 +189,15 @@ class TestParse(TestBase):
     assert Bar._fields == [
       (b'a', StructField(Int)),
       (b'f', StructField(Foo)),
+    ]
+
+  def test_enum(self):
+    p = Parser(b'enum E [a: Int; b: Bytes]')
+    p.parse()
+    E = p.env.tys[b'E']
+    assert E._variants == [
+      (b'a', Int),
+      (b'b', Bytes),
     ]
 
 if __name__ == '__main__':
