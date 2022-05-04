@@ -64,7 +64,8 @@ class TestZoaRaw(unittest.TestCase):
 
 
 class TestBase(unittest.TestCase):
-  def setUp(self): self.env = TyEnv()
+  def setUp(self):
+    self.env = TyEnv()
 
 class TestZoaTy(TestBase):
   def test_int(self):
@@ -121,7 +122,10 @@ class TestZoaTy(TestBase):
 
 def tokens(buf):
   out, p = [], Parser(buf)
-  while p.i < len(buf): out.append(p.token().decode('utf-8'))
+  while p.i < len(buf):
+    t = p.token()
+    if not t: break
+    out.append(t.decode('utf-8'))
   return out
 
 class TestParse(TestBase):
@@ -133,16 +137,26 @@ class TestParse(TestBase):
     assert TG.fromChr(ord('_')) is TG.T_ALPHA
     assert TG.fromChr(ord('.')) is TG.T_SINGLE
 
+  def test_skipWhitespace(self):
+    p = Parser(b'   \nfoo')
+    assert p.i == 0
+    p.skipWhitespace(); assert p.i == 4
+    p.skipWhitespace(); assert p.i == 4
+
+  def test_single(self):
+    assert b']' == Parser(b']').token()
+    assert b')' == Parser(b')').token()
+    assert b'a' == Parser(b'a').token()
+
   def test_tokens(self):
     assert tokens(b'a_b[foo.bar baz]') == [
       'a_b', '[', 'foo', '.', 'bar', 'baz', ']']
 
-
-  # def test_struct(self):
-  #   p = Parser(b'struct foo [a: Int]')
-  #   p.parse()
-  #   foo = self.env.tys['foo']
-  #   assert foo._fields == [('a', Int)]
+  def test_struct(self):
+    p = Parser(b'struct foo [a: Int]')
+    p.parse()
+    foo = p.env.tys[b'foo']
+    assert foo._fields == [(b'a', StructField(Int))]
 
 if __name__ == '__main__':
   unittest.main()
