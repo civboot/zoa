@@ -210,21 +210,21 @@ class StructBase:
     posArgs = 0; posArgsDone = False
     for name, f in self._fields:
       if f.zid is None: # positional arg
-        if getattr(self, name) is None: posArgsDone = True
+        if getattr(self, name.decode('utf-8')) is None: posArgsDone = True
         elif posArgsDone: raise ValueError(
           f"{name} has value after previous positional arg wasn't specified")
         else: posArgs += 1
 
     out = [Int(posArgs).toZ()] # starts with number of positional arguments
     for name, f in self._fields:
-      if f.zid is None: out.append(getattr(self, name).toZ())
+      if f.zid is None: out.append(getattr(self, name.decode('utf-8')).toZ())
       else: out.append(ZoaRaw.new_arr([f.zid, self.get(name).toZ()]))
     return ZoaRaw.new_arr(out)
 
 @dataclass(init=False)
 class EnumBase:
   @classmethod
-  def frZ(cls, z: ZoaRaw) -> EnumBase:
+  def frZ(cls, z: ZoaRaw) -> 'EnumBase':
     variant = Int.frZ(z.arr[0])
     name, ty = self._variants[variant]
     return cls(**{name.decode('utf-8'): ty})
@@ -245,9 +245,18 @@ class BmVar: # Bitmap Variant
   var: int  # the value for this variant, i.e. 0b10
   msk: int  # the mask for this variant,  i.e. 0b11
 
-  def _setVariantClosure(varSelf):
+  def _getVariantClosure(varSelf):
     def closure(bitmapSelf):
-      bitmapSelf.value = ((~varSelf.msk) & bitmapSelf.value) | varSelf.var
+      return varSelf.msk & bitmapSelf.value
+    return closure
+
+  def _setVariantClosure(varSelf):
+    def closure(bitmapSelf, var=None):
+      if var is None: var = varSelf.var
+      if var != 0 and var != varSelf.msk & var:
+        raise ValueError(
+          f'Attempt to set invalid. var={hex(var)} msk={hex(varSelf.msk)}')
+      bitmapSelf.value = ((~varSelf.msk) & bitmapSelf.value) | var
     return closure
 
   def _isVariantClosure(varSelf):
@@ -310,10 +319,11 @@ class TyEnv:
     mn = modname(mod, name)
     methods = {'name': mn}
     for n, var in variants:
-      n = n[0].upper() + (n[1:] if len(n) > 1 else '') # capitalize first letter
-      methods['is' + n] = var._isVariantClosure()
-      methods['set' + n] = var._setVariantClosure()
-    ty = type(name, (BitmapBase,), methods)
+      n = n.decode('utf-8')
+      methods['get_' + n] = var._getVariantClosure()
+      methods['set_' + n] = var._setVariantClosure()
+      methods['is_' + n] = var._isVariantClosure()
+    ty = type(name.decode('utf-8'), (BitmapBase,), methods)
     self.tys[mn] = ty
     return ty
 

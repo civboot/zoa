@@ -91,8 +91,8 @@ class TestZoaTy(TestBase):
     assert b == Bytes.frZ(ZoaRaw.new_data(b'abc 123'))
 
   def test_struct(self):
-    ty = self.env.struct(None, 'foo', [
-        ('a', StructField(Int)),
+    ty = self.env.struct(None, b'foo', [
+        (b'a', StructField(Int)),
     ])
     z = ZoaRaw.new_arr([
         Int(1).toZ(),  # numPositional
@@ -102,23 +102,29 @@ class TestZoaTy(TestBase):
     assert s.a == 0x77
     assert z == s.toZ()
 
+  # def test_enum(self):
+  #   assert False
+
   def test_bitmap(self):
-    ty = self.env.bitmap(None, 'bm', [
-        ('a',     BmVar(0x01, 0x03)),
-        ('b',     BmVar(0x03, 0x03)),
-        ('noTop', BmVar(0x00, 0x10)),
-        ('top',   BmVar(0x10, 0x10)),
+    ty = self.env.bitmap(None, b'bm', [
+        (b'a',     BmVar(0x01, 0x03)),
+        (b'b',     BmVar(0x03, 0x03)),
+        (b'noTop', BmVar(0x00, 0x10)),
+        (b'top',   BmVar(0x10, 0x10)),
     ])
-    bm = ty();      assert 0 == bm.value
-    bm.setTop();    assert 0x10 == bm.value
-    bm.setNoTop();  assert 0x00 == bm.value
-    bm.setA();      assert 0x01 == bm.value
-    bm.setB();      assert 0x03 == bm.value
-    bm.setA();      assert 0x01 == bm.value
-    bm.setTop();    assert 0x11 == bm.value
-    assert True == bm.isA()
-    assert False == bm.isB()
-    assert True == bm.isTop()
+    bm = ty();       assert 0 == bm.value
+    bm.set_top();    assert 0x10 == bm.value
+    bm.set_noTop();  assert 0x00 == bm.value
+    bm.set_a();      assert 0x01 == bm.value
+    assert 0x01 == bm.get_a()
+    bm.set_b();      assert 0x03 == bm.value
+    assert 0x03 == bm.get_a()
+    bm.set_a();      assert 0x01 == bm.value
+    bm.set_top();    assert 0x11 == bm.value
+    assert  bm.is_a()
+    assert not bm.is_b()
+    assert bm.is_top()
+    bm.set_a(0x03);  assert bm.is_b()
 
 def tokens(buf):
   out, p = [], Parser(buf)
